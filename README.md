@@ -11,4 +11,4 @@ Developing and Testing Sonar Technology
 |----|------|
 |2264|Big   |
 |648 |Small |
-|350 |Bit   |
+|350 |Big   |
