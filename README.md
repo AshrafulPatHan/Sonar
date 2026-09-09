@@ -9,5 +9,5 @@ Developing and Testing Sonar Technology
 ## Hz For Test
 | Hz | Type |
 |----|------|
-|2264|Bit   |
+|2264|Big   |
 |648 |Small |
