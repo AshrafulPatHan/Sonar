@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Echo Bench — 2D Acoustic Reflection Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #100e0b;
+    --panel: #1c1912;
+    --panel-alt: #221e15;
+    --border: #3a3324;
+    --accent: #f2a541;   /* amber phosphor */
+    --accent-dim: #8a6a35;
+    --teal: #4fd1c5;     /* mic / waveform trace */
+    --steel: #6fa8c9;    /* obstacle */
+    --text: #f2ede1;
+    --text-dim: #a99f88;
+    --danger: #e0645a;
+    --radius: 10px;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    font-family: 'Space Grotesk', system-ui, -apple-system, sans-serif;
+    background:
+      radial-gradient(1200px 600px at 15% -10%, #23200f 0%, transparent 60%),
+      var(--bg);
+    color: var(--text);
+    margin: 0;
+    padding: 24px 16px 60px;
+    display: flex;
+    justify-content: center;
+  }
+
+  .container {
+    max-width: 1040px;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  header.top { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+
+  h1 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+  }
+  h1 .mark { color: var(--accent); }
+
+  .subtitle {
+    color: var(--text-dim);
+    font-size: 0.88rem;
+    margin: 2px 0 0;
+    line-height: 1.5;
+  }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px;
+  }
+
+  .grid-layout {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    gap: 18px;
+    align-items: start;
+  }
+  @media (max-width: 760px) {
+    .grid-layout { grid-template-columns: 1fr; }
+  }
+
+  .controls { display: flex; flex-direction: column; gap: 16px; }
+
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+
+  label {
+    font-size: 0.76rem;
+    color: var(--text-dim);
+    letter-spacing: 0.02em;
+  }
+
+  select, button {
+    background: var(--panel-alt);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 10px 11px;
+    border-radius: 7px;
+    font-size: 0.88rem;
+    font-family: inherit;
+    outline: none;
+  }
+
+  select { appearance: none; cursor: pointer; }
+  select:focus, button:focus-visible {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(242, 165, 65, 0.18);
+  }
+
+  .btn-row { display: flex; gap: 10px; }
+
+  button.primary {
+    flex: 1;
+    background: var(--accent);
+    color: #221a08;
+    font-weight: 700;
+    cursor: pointer;
+    border: none;
+    transition: filter 0.15s ease;
+  }
+  button.primary:hover:not(:disabled) { filter: brightness(1.08); }
+  button.primary:disabled { background: var(--border); color: var(--text-dim); cursor: not-allowed; }
+
+  button.secondary {
+    cursor: pointer;
+    color: var(--text-dim);
+  }
+  button.secondary:hover:not(:disabled) { color: var(--text); border-color: var(--text-dim); }
+  button.secondary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .status-line {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.76rem;
+    color: var(--text-dim);
+  }
+  .led {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--border);
+    box-shadow: none;
+    flex-shrink: 0;
+    transition: background 0.2s, box-shadow 0.2s;
+  }
+  .led.running { background: #7ee787; box-shadow: 0 0 8px 1px #7ee787aa; }
+  .led.done { background: var(--accent); box-shadow: 0 0 8px 1px rgba(242,165,65,0.6); }
+
+  .progress-track {
+    height: 4px;
+    border-radius: 2px;
+    background: var(--panel-alt);
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--accent);
+    transition: width 0.08s linear;
+  }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 16px;
+    font-size: 0.76rem;
+    color: var(--text-dim);
+    padding-top: 4px;
+    border-top: 1px solid var(--border);
+  }
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+
+  .canvas-panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .canvas-frame {
+    background: #000;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px;
+  }
+
+  canvas {
+    display: block;
+    width: 100%;
+    background-color: #000;
+    border-radius: 3px;
+    image-rendering: pixelated;
+  }
+  #waveGridCanvas { aspect-ratio: 1 / 1; }
+  #waveformCanvas { height: 130px; width: 100%; }
+
+  .readout-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.76rem;
+    color: var(--text-dim);
+  }
+  .readout-label span.val {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--accent);
+  }
+
+  .audio-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 4px;
+    flex-wrap: wrap;
+  }
+
+  audio { flex: 1; min-width: 200px; height: 38px; }
+
+  footer.note {
+    font-size: 0.76rem;
+    color: var(--text-dim);
+    line-height: 1.6;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header class="top">
+    <div>
+      <h1>Echo<span class="mark">Bench</span></h1>
+      <p class="subtitle">2D finite-difference acoustic simulator — pings a source, reflects sound off a chosen obstacle shape, and records what a microphone hears. Room walls absorb sound; only the obstacle reflects it.</p>
+    </div>
+  </header>
+
+  <div class="grid-layout">
+    <!-- Controls Panel -->
+    <div class="card controls">
+      <div class="form-group">
+        <label for="shapeSelect">Obstacle geometry</label>
+        <select id="shapeSelect">
+          <option value="circle">Circle</option>
+          <option value="triangle">Triangle</option>
+          <option value="star">Star (complex multi-reflection)</option>
+          <option value="box">Square box</option>
+          <option value="concave">Concave dish (focusing mirror)</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="materialSelect">Obstacle material</label>
+        <select id="materialSelect">
+          <option value="rigid">Rigid solid — steel / rock (strong echo)</option>
+          <option value="medium">Wood — moderate damping</option>
+          <option value="soft">Soft foam — high absorption</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="freqSelect">Source signal</label>
+        <select id="freqSelect">
+          <option value="pulse">Short Gaussian pulse</option>
+          <option value="chirp">Frequency-modulated chirp</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="qualitySelect">Grid resolution (performance)</label>
+        <select id="qualitySelect">
+          <option value="80">Low — 80×80 (fastest, low-end devices)</option>
+          <option value="120" selected>Medium — 120×120 (recommended)</option>
+          <option value="160">High — 160×160 (slower devices may lag)</option>
+        </select>
+      </div>
+
+      <div class="btn-row">
+        <button id="startBtn" class="primary">Run simulation</button>
+        <button id="resetBtn" class="secondary" disabled>Reset</button>
+      </div>
+
+      <div class="status-line">
+        <div id="statusLed" class="led"></div>
+        <span id="statusText">Idle — ready to run</span>
+      </div>
+      <div class="progress-track"><div id="progressFill" class="progress-fill"></div></div>
+
+      <div class="legend">
+        <div class="legend-item"><div class="dot" style="background:var(--accent);"></div> Source (speaker)</div>
+        <div class="legend-item"><div class="dot" style="background:var(--teal);"></div> Mic (receiver)</div>
+        <div class="legend-item"><div class="dot" style="background:var(--steel);"></div> Obstacle</div>
+      </div>
+    </div>
+
+    <!-- 2D Wave Grid Canvas -->
+    <div class="canvas-panel">
+      <div class="readout-label">
+        <span>Acoustic pressure field</span>
+        <span class="val" id="stepReadout">step 0 / 600</span>
+      </div>
+      <div class="canvas-frame">
+        <canvas id="waveGridCanvas" width="120" height="120"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recorded Audio Waveform & Output -->
+  <div class="card">
+    <div class="readout-label">
+      <span>Mic signal — direct wave + obstacle reflection</span>
+      <span class="val" id="waveReadout">—</span>
+    </div>
+    <div class="canvas-frame" style="margin-top:8px;">
+      <canvas id="waveformCanvas"></canvas>
+    </div>
+
+    <div class="audio-controls">
+      <audio id="audioPlayer" controls></audio>
+      <button id="downloadBtn" class="secondary" disabled>Download .wav</button>
+    </div>
+  </div>
+
+  <footer class="note">
+    Walls use an absorbing sponge boundary, so sound leaves the room instead of bouncing back — only the highlighted obstacle produces an echo. Lower the grid resolution if the simulation feels sluggish on your device.
+  </footer>
+</div>
+
+<script>
+/**
+ * 2D Wave Propagation Engine (2-time-step FDTD)
+ * Solves: d²u/dt² = c² * (d²u/dx² + d²u/dy²)
+ *
+ * Boundary handling:
+ *  - Obstacle cells: hard reflective (u = 0), so the chosen shape produces a real echo.
+ *  - Outer room walls: absorbing "sponge" layer — pressure is progressively damped
+ *    as it approaches the edge, so it dissipates instead of bouncing back.
+ */
+
+let GRID_SIZE = 120;
+let u, uPrev, uNext, obstacles;
+let spongeIdx = [];   // indices of border-band cells
+let spongeFactor = []; // matching damping factor per index
+
+let SOURCE, MIC, SHAPE_CENTER, SHAPE_SIZE;
+
+let animationId = null;
+let recordedMicSignal = [];
+let audioBufferResult = null;
+let isRunning = false;
+
+// UI Elements
+const gridCanvas = document.getElementById('waveGridCanvas');
+const waveCanvas = document.getElementById('waveformCanvas');
+const gridCtx = gridCanvas.getContext('2d', { alpha: false });
+const waveCtx = waveCanvas.getContext('2d', { alpha: false });
+
+const shapeSelect = document.getElementById('shapeSelect');
+const materialSelect = document.getElementById('materialSelect');
+const freqSelect = document.getElementById('freqSelect');
+const qualitySelect = document.getElementById('qualitySelect');
+const startBtn = document.getElementById('startBtn');
+const resetBtn = document.getElementById('resetBtn');
+const downloadBtn = document.getElementById('downloadBtn');
+const audioPlayer = document.getElementById('audioPlayer');
+const statusLed = document.getElementById('statusLed');
+const statusText = document.getElementById('statusText');
+const progressFill = document.getElementById('progressFill');
+const stepReadout = document.getElementById('stepReadout');
+const waveReadout = document.getElementById('waveReadout');
+
+const TOTAL_STEPS = 600;
+const STEPS_PER_FRAME = 2; // advance physics twice per rendered frame: fewer draw calls, faster finish
+
+/** Fix the waveform canvas's backing resolution once (and on resize), not every frame. */
+function sizeWaveCanvas() {
+  const w = waveCanvas.clientWidth || 400;
+  const h = waveCanvas.clientHeight || 130;
+  if (waveCanvas.width !== w) waveCanvas.width = w;
+  if (waveCanvas.height !== h) waveCanvas.height = h;
+}
+window.addEventListener('resize', () => { sizeWaveCanvas(); drawWaveform(); });
+
+/** Allocate simulation buffers and derive scene layout for the chosen grid size. */
+function allocateGrid(size) {
+  GRID_SIZE = size;
+  u = new Float32Array(GRID_SIZE * GRID_SIZE);
+  uPrev = new Float32Array(GRID_SIZE * GRID_SIZE);
+  uNext = new Float32Array(GRID_SIZE * GRID_SIZE);
+  obstacles = new Uint8Array(GRID_SIZE * GRID_SIZE);
+
+  // Layout is proportional to grid size so any resolution keeps the same scene geometry.
+  SOURCE = { x: Math.round(GRID_SIZE * 0.1875), y: Math.round(GRID_SIZE * 0.5) };
+  MIC = { x: Math.round(GRID_SIZE * 0.1875), y: Math.round(GRID_SIZE * 0.3125) };
+  SHAPE_CENTER = { x: Math.round(GRID_SIZE * 0.65625), y: Math.round(GRID_SIZE * 0.5) };
+  SHAPE_SIZE = GRID_SIZE * 0.1875;
+
+  gridCanvas.width = GRID_SIZE;
+  gridCanvas.height = GRID_SIZE;
+
+  buildSpongeLayer();
+}
+
+/**
+ * Precompute an absorbing "sponge" boundary band once per grid size.
+ * Cells near the outer edge get an extra per-step multiplier < 1, smoothly
+ * ramping from 1 (no effect, interior) down toward 0 at the outer edge.
+ * Only the band cells are stored, so applying it each step is cheap
+ * (touches a small fraction of the grid, not every cell).
+ */
+function buildSpongeLayer() {
+  spongeIdx = [];
+  spongeFactor = [];
+  const bandWidth = Math.max(10, Math.round(GRID_SIZE * 0.12));
+
+  for (let y = 1; y < GRID_SIZE - 1; y++) {
+    for (let x = 1; x < GRID_SIZE - 1; x++) {
+      const distToEdge = Math.min(x, y, GRID_SIZE - 1 - x, GRID_SIZE - 1 - y);
+      if (distToEdge < bandWidth) {
+        const depth = (bandWidth - distToEdge) / bandWidth; // 0 at inner edge of band -> 1 at wall
+        const factor = 1 - 0.55 * depth * depth; // smooth quadratic falloff, absorbs over the band
+        spongeIdx.push(y * GRID_SIZE + x);
+        spongeFactor.push(factor);
+      }
+    }
+  }
+}
+
+/** Render obstacle geometry into the obstacle mask. */
+function generateObstacles(shapeType) {
+  obstacles.fill(0);
+
+  for (let y = 0; y < GRID_SIZE; y++) {
+    for (let x = 0; x < GRID_SIZE; x++) {
+      const idx = y * GRID_SIZE + x;
+      const dx = x - SHAPE_CENTER.x;
+      const dy = y - SHAPE_CENTER.y;
+
+      let isInside = false;
+
+      switch (shapeType) {
+        case 'circle':
+          isInside = (dx * dx + dy * dy) <= (SHAPE_SIZE * SHAPE_SIZE);
+          break;
+
+        case 'box':
+          isInside = Math.abs(dx) <= SHAPE_SIZE && Math.abs(dy) <= SHAPE_SIZE;
+          break;
+
+        case 'triangle': {
+          const qx = dx + SHAPE_SIZE * 0.33;
+          const insideY = Math.abs(dy) <= (qx + SHAPE_SIZE) * 0.7;
+          const insideX = qx >= -SHAPE_SIZE && qx <= SHAPE_SIZE;
+          isInside = insideY && insideX;
+          break;
+        }
+
+        case 'star': {
+          const angle = Math.atan2(dy, dx);
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          const r = SHAPE_SIZE * (0.6 + 0.4 * Math.cos(5 * angle));
+          isInside = dist <= r;
+          break;
+        }
+
+        case 'concave': {
+          const distOuter = (dx * dx + dy * dy) <= (SHAPE_SIZE * SHAPE_SIZE + GRID_SIZE * 1.3);
+          const cutout = ((dx - SHAPE_SIZE * 0.33) * (dx - SHAPE_SIZE * 0.33) + dy * dy) <= (SHAPE_SIZE * SHAPE_SIZE);
+          isInside = distOuter && !cutout && dx < SHAPE_SIZE * 0.5;
+          break;
+        }
+      }
+
+      if (isInside) obstacles[idx] = 1;
+    }
+  }
+}
+
+function setStatus(state, text) {
+  statusLed.className = 'led' + (state ? ' ' + state : '');
+  statusText.textContent = text;
+}
+
+function setControlsEnabled(enabled) {
+  shapeSelect.disabled = !enabled;
+  materialSelect.disabled = !enabled;
+  freqSelect.disabled = !enabled;
+  qualitySelect.disabled = !enabled;
+  startBtn.disabled = !enabled;
+  resetBtn.disabled = enabled; // reset only useful once something has run/is running
+}
+
+function runSimulation() {
+  if (animationId) cancelAnimationFrame(animationId);
+
+  allocateGrid(parseInt(qualitySelect.value, 10));
+  generateObstacles(shapeSelect.value);
+  sizeWaveCanvas();
+
+  recordedMicSignal = [];
+  audioBufferResult = null;
+  downloadBtn.disabled = true;
+  progressFill.style.width = '0%';
+  waveReadout.textContent = '—';
+  isRunning = true;
+  setControlsEnabled(false);
+  resetBtn.disabled = false;
+  setStatus('running', 'Simulating…');
+
+  const matType = materialSelect.value;
+  const damping = matType === 'rigid' ? 0.998 : (matType === 'medium' ? 0.98 : 0.92);
+  const c = 0.45; // Courant-stable wave speed constant (c < 1/sqrt(2))
+  const signalType = freqSelect.value;
+
+  const imgData = gridCtx.createImageData(GRID_SIZE, GRID_SIZE);
+  // Obstacle pixels never change during a run — paint them once, then only
+  // touch non-obstacle pixels every frame.
+  paintObstaclesBase(imgData);
+
+  let currentStep = 0;
+
+  function physicsStep() {
+    // 1. Inject source emission during the first 40 steps.
+    if (currentStep < 40) {
+      const srcIdx = SOURCE.y * GRID_SIZE + SOURCE.x;
+      if (signalType === 'pulse') {
+        const t = currentStep - 20;
+        u[srcIdx] += Math.exp(-0.02 * t * t) * 2.0;
+      } else {
+        u[srcIdx] += Math.sin(0.4 * currentStep) * 1.5;
+      }
+    }
+
+    // 2. FDTD update over the interior grid.
+    for (let y = 1; y < GRID_SIZE - 1; y++) {
+      const row = y * GRID_SIZE;
+      for (let x = 1; x < GRID_SIZE - 1; x++) {
+        const idx = row + x;
+
+        if (obstacles[idx] === 1) {
+          uNext[idx] = 0; // hard reflective obstacle
+          continue;
+        }
+
+        const laplacian = u[idx - 1] + u[idx + 1] + u[idx - GRID_SIZE] + u[idx + GRID_SIZE] - 4 * u[idx];
+        uNext[idx] = (2 * u[idx] - uPrev[idx] + c * c * laplacian) * damping;
+      }
+    }
+
+    // 3. Absorb the outer walls: extra damping only on the precomputed border band,
+    //    so sound dissipates at the room edge instead of reflecting back.
+    for (let i = 0; i < spongeIdx.length; i++) {
+      uNext[spongeIdx[i]] *= spongeFactor[i];
+    }
+
+    uPrev.set(u);
+    u.set(uNext);
+
+    const micIdx = MIC.y * GRID_SIZE + MIC.x;
+    recordedMicSignal.push(u[micIdx]);
+    currentStep++;
+  }
+
+  function frame() {
+    if (currentStep >= TOTAL_STEPS) {
+      finalizeAudioResult();
+      return;
+    }
+
+    for (let s = 0; s < STEPS_PER_FRAME && currentStep < TOTAL_STEPS; s++) {
+      physicsStep();
+    }
+
+    drawGrid(imgData);
+    drawWaveform();
+    progressFill.style.width = (100 * currentStep / TOTAL_STEPS).toFixed(1) + '%';
+    stepReadout.textContent = `step ${currentStep} / ${TOTAL_STEPS}`;
+
+    animationId = requestAnimationFrame(frame);
+  }
+
+  frame();
+}
+
+function paintObstaclesBase(imgData) {
+  const data = imgData.data;
+  for (let i = 0; i < GRID_SIZE * GRID_SIZE; i++) {
+    const p = i * 4;
+    if (obstacles[i] === 1) {
+      data[p] = 111; data[p + 1] = 168; data[p + 2] = 201; data[p + 3] = 255; // steel blue
+    } else {
+      data[p] = 0; data[p + 1] = 0; data[p + 2] = 0; data[p + 3] = 255;
+    }
+  }
+}
+
+function drawGrid(imgData) {
+  const data = imgData.data;
+
+  for (let i = 0; i < GRID_SIZE * GRID_SIZE; i++) {
+    if (obstacles[i] === 1) continue; // static, already painted
+
+    const p = i * 4;
+    const val = u[i];
+    const pos = Math.min(255, Math.max(0, Math.floor(val * 180)));
+    const neg = Math.min(255, Math.max(0, Math.floor(-val * 180)));
+
+    data[p] = Math.min(255, neg + Math.floor(pos * 0.55));      // amber-ish positive lobe
+    data[p + 1] = Math.floor(pos * 0.75);
+    data[p + 2] = Math.min(255, Math.floor(pos * 0.3 + neg * 0.9));
+    data[p + 3] = 255;
+  }
+
+  gridCtx.putImageData(imgData, 0, 0);
+
+  const markerSize = Math.max(2, Math.round(GRID_SIZE / 40));
+  gridCtx.fillStyle = '#f2a541';
+  gridCtx.fillRect(SOURCE.x - markerSize, SOURCE.y - markerSize, markerSize * 2 + 1, markerSize * 2 + 1);
+
+  gridCtx.fillStyle = '#4fd1c5';
+  gridCtx.fillRect(MIC.x - markerSize, MIC.y - markerSize, markerSize * 2 + 1, markerSize * 2 + 1);
+}
+
+function drawWaveform() {
+  const w = waveCanvas.width;
+  const h = waveCanvas.height;
+  const midY = h / 2;
+
+  waveCtx.fillStyle = '#000000';
+  waveCtx.fillRect(0, 0, w, h);
+
+  waveCtx.strokeStyle = '#3a3324';
+  waveCtx.beginPath();
+  waveCtx.moveTo(0, midY);
+  waveCtx.lineTo(w, midY);
+  waveCtx.stroke();
+
+  if (recordedMicSignal.length === 0) return;
+
+  waveCtx.strokeStyle = '#4fd1c5';
+  waveCtx.lineWidth = 2;
+  waveCtx.beginPath();
+
+  const dx = w / TOTAL_STEPS;
+  for (let i = 0; i < recordedMicSignal.length; i++) {
+    const x = i * dx;
+    const y = midY - recordedMicSignal[i] * (h * 0.4);
+    if (i === 0) waveCtx.moveTo(x, y);
+    else waveCtx.lineTo(x, y);
+  }
+  waveCtx.stroke();
+
+  let peak = 0;
+  for (let i = 0; i < recordedMicSignal.length; i++) peak = Math.max(peak, Math.abs(recordedMicSignal[i]));
+  waveReadout.textContent = `peak ${peak.toFixed(3)}`;
+}
+
+function finalizeAudioResult() {
+  const sampleRate = 22050;
+
+  const soundBuffer = { sampleRate, length: recordedMicSignal.length * 20 };
+  const channelData = new Float32Array(soundBuffer.length);
+  for (let i = 0; i < channelData.length; i++) {
+    const srcIdx = Math.floor(i / 20);
+    channelData[i] = recordedMicSignal[srcIdx] || 0;
+  }
+
+  audioBufferResult = { sampleRate, channelData };
+
+  const wavBlob = audioBufferToWavBlob(audioBufferResult);
+  const audioUrl = URL.createObjectURL(wavBlob);
+  audioPlayer.src = audioUrl;
+  downloadBtn.disabled = false;
+
+  isRunning = false;
+  setControlsEnabled(true);
+  setStatus('done', 'Done — echo captured');
+  stepReadout.textContent = `step ${TOTAL_STEPS} / ${TOTAL_STEPS}`;
+}
+
+function audioBufferToWavBlob(buffer) {
+  const numChannels = 1;
+  const sampleRate = buffer.sampleRate;
+  const bitDepth = 16;
+  const samples = buffer.channelData;
+
+  const bytesPerSample = bitDepth / 8;
+  const blockAlign = numChannels * bytesPerSample;
+  const wavBuffer = new ArrayBuffer(44 + samples.length * bytesPerSample);
+  const view = new DataView(wavBuffer);
+
+  writeString(view, 0, 'RIFF');
+  view.setUint32(4, 36 + samples.length * bytesPerSample, true);
+  writeString(view, 8, 'WAVE');
+  writeString(view, 12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, numChannels, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * blockAlign, true);
+  view.setUint16(32, blockAlign, true);
+  view.setUint16(34, bitDepth, true);
+  writeString(view, 36, 'data');
+  view.setUint32(40, samples.length * bytesPerSample, true);
+
+  let offset = 44;
+  for (let i = 0; i < samples.length; i++, offset += 2) {
+    const s = Math.max(-1, Math.min(1, samples[i]));
+    view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+  }
+
+  return new Blob([wavBuffer], { type: 'audio/wav' });
+}
+
+function writeString(view, offset, string) {
+  for (let i = 0; i < string.length; i++) {
+    view.setUint8(offset + i, string.charCodeAt(i));
+  }
+}
+
+function resetSimulation() {
+  if (animationId) cancelAnimationFrame(animationId);
+  animationId = null;
+  isRunning = false;
+  recordedMicSignal = [];
+  audioBufferResult = null;
+  downloadBtn.disabled = true;
+  audioPlayer.removeAttribute('src');
+  progressFill.style.width = '0%';
+  stepReadout.textContent = `step 0 / ${TOTAL_STEPS}`;
+  waveReadout.textContent = '—';
+  setStatus('', 'Idle — ready to run');
+  setControlsEnabled(true);
+  resetBtn.disabled = true;
+
+  allocateGrid(parseInt(qualitySelect.value, 10));
+  generateObstacles(shapeSelect.value);
+  sizeWaveCanvas();
+  const imgData = gridCtx.createImageData(GRID_SIZE, GRID_SIZE);
+  paintObstaclesBase(imgData);
+  gridCtx.putImageData(imgData, 0, 0);
+  waveCtx.fillStyle = '#000';
+  waveCtx.fillRect(0, 0, waveCanvas.width, waveCanvas.height);
+}
+
+// Event Listeners
+startBtn.addEventListener('click', runSimulation);
+resetBtn.addEventListener('click', resetSimulation);
+
+downloadBtn.addEventListener('click', () => {
+  if (!audioBufferResult) return;
+  const blob = audioBufferToWavBlob(audioBufferResult);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `echo_${shapeSelect.value}_${materialSelect.value}.wav`;
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+// Initial idle scene (no animation) so the page loads fast and cheap.
+allocateGrid(parseInt(qualitySelect.value, 10));
+generateObstacles(shapeSelect.value);
+sizeWaveCanvas();
+(function initialPaint() {
+  const imgData = gridCtx.createImageData(GRID_SIZE, GRID_SIZE);
+  paintObstaclesBase(imgData);
+  gridCtx.putImageData(imgData, 0, 0);
+  waveCtx.fillStyle = '#000';
+  waveCtx.fillRect(0, 0, waveCanvas.width, waveCanvas.height);
+})();
+</script>
+</body>
+</html>

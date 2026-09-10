@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Acoustic Echo & Echolocation Simulator</title>
+  <style>
+    :root {
+      --bg-color: #0f172a;
+      --card-bg: #1e293b;
+      --accent-color: #10b981;
+      --text-color: #f8fafc;
+      --text-dim: #94a3b8;
+      --border-color: #334155;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      max-width: 900px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.5rem;
+      color: var(--accent-color);
+    }
+
+    p.subtitle {
+      margin: 4px 0 0 0;
+      color: var(--text-dim);
+      font-size: 0.9rem;
+    }
+
+    .card {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 20px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    label {
+      font-size: 0.85rem;
+      color: var(--text-dim);
+      font-weight: 600;
+    }
+
+    input, select, button {
+      background-color: var(--bg-color);
+      border: 1px solid var(--border-color);
+      color: var(--text-color);
+      padding: 10px;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      outline: none;
+    }
+
+    input:focus, select:focus {
+      border-color: var(--accent-color);
+    }
+
+    button {
+      background-color: var(--accent-color);
+      color: #000;
+      font-weight: bold;
+      cursor: pointer;
+      border: none;
+      transition: opacity 0.2s;
+    }
+
+    button:hover {
+      opacity: 0.9;
+    }
+
+    button:disabled {
+      background-color: var(--border-color);
+      color: var(--text-dim);
+      cursor: not-allowed;
+    }
+
+    canvas {
+      width: 100%;
+      height: 200px;
+      background-color: #020617;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 10px;
+      margin-top: 15px;
+      padding-top: 15px;
+      border-top: 1px solid var(--border-color);
+    }
+
+    .stat-item {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .stat-value {
+      font-size: 1.1rem;
+      font-weight: bold;
+      color: var(--accent-color);
+    }
+
+    .stat-label {
+      font-size: 0.75rem;
+      color: var(--text-dim);
+    }
+
+    .audio-controls {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      margin-top: 15px;
+    }
+
+    audio {
+      width: 100%;
+      height: 40px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <div>
+    <h1>Acoustic Echo Simulator & Data Generator</h1>
+    <p class="subtitle">Simulate sound reflections off materials to collect echolocation datasets.</p>
+  </div>
+
+  <!-- Settings Panel -->
+  <div class="card">
+    <div class="grid">
+      <div class="form-group">
+        <label for="distance">Object Distance (meters)</label>
+        <input type="number" id="distance" value="15" min="1" max="100" step="0.5">
+      </div>
+
+      <div class="form-group">
+        <label for="material">Object Material</label>
+        <select id="material">
+          <option value="steel">Steel (High Reflection, Bright)</option>
+          <option value="concrete">Concrete (Medium-High Reflection)</option>
+          <option value="wood">Wood (Dampened Highs)</option>
+          <option value="fabric">Fabric / Cloth (High Absorption)</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="signalType">Signal Type</label>
+        <select id="signalType">
+          <option value="ping">1 kHz Sine Ping Pulse</option>
+          <option value="chirp">1 kHz to 8 kHz Linear Chirp</option>
+        </select>
+      </div>
+
+      <div class="form-group" style="justify-content: flex-end;">
+        <button id="simulateBtn">Run Echo Simulation</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Visualization Panel -->
+  <div class="card">
+    <label>Reflected Signal Waveform (Amplitude vs Time)</label>
+    <canvas id="waveformCanvas"></canvas>
+
+    <div class="stats">
+      <div class="stat-item">
+        <span class="stat-label">Calculated Round-Trip Time</span>
+        <span class="stat-value" id="delayStat">0.00 ms</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">Estimated Peak Amplitude</span>
+        <span class="stat-value" id="ampStat">0.00 dB</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">Speed of Sound</span>
+        <span class="stat-value">343 m/s</span>
+      </div>
+    </div>
+
+    <div class="audio-controls">
+      <audio id="audioPlayer" controls></audio>
+      <button id="downloadBtn" style="white-space: nowrap;" disabled>Download .WAV Echo</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/**
+ * Acoustic Physics Configuration & Presets
+ */
+const MATERIALS = {
+  steel:    { absorption: 0.05, highFreqCutoff: 18000 },
+  concrete: { absorption: 0.15, highFreqCutoff: 12000 },
+  wood:     { absorption: 0.45, highFreqCutoff: 5000 },
+  fabric:   { absorption: 0.85, highFreqCutoff: 1800 }
+};
+
+const SPEED_OF_SOUND = 343; // meters per second
+
+let currentRenderedBuffer = null;
+
+// UI Elements
+const distanceInput = document.getElementById('distance');
+const materialSelect = document.getElementById('material');
+const signalTypeSelect = document.getElementById('signalType');
+const simulateBtn = document.getElementById('simulateBtn');
+const downloadBtn = document.getElementById('downloadBtn');
+const audioPlayer = document.getElementById('audioPlayer');
+const delayStat = document.getElementById('delayStat');
+const ampStat = document.getElementById('ampStat');
+const canvas = document.getElementById('waveformCanvas');
+
+/**
+ * Main Simulation Logic
+ */
+async function runSimulation() {
+  const distance = parseFloat(distanceInput.value);
+  const materialKey = materialSelect.value;
+  const signalType = signalTypeSelect.value;
+  const material = MATERIALS[materialKey];
+
+  // 1. Calculate time delay for round-trip distance
+  const roundTripDistance = 2 * distance;
+  const delayTime = roundTripDistance / SPEED_OF_SOUND;
+
+  // 2. Synthesize original pulse sound
+  const sampleRate = 44100;
+  const pulseDuration = 0.05; // 50ms pulse
+  const audioCtx = new AudioContext();
+  const basePulse = createPulseBuffer(audioCtx, signalType, pulseDuration, sampleRate);
+
+  // 3. Process sound using OfflineAudioContext (Acoustic DSP Pipeline)
+  const totalDuration = delayTime + pulseDuration + 0.2; // Extra pad
+  const offlineCtx = new OfflineAudioContext(1, Math.ceil(totalDuration * sampleRate), sampleRate);
+
+  // Source node
+  const source = offlineCtx.createBufferSource();
+  source.buffer = basePulse;
+
+  // Original Pulse Direct Path (To see original emitted signal)
+  const directGain = offlineCtx.createGain();
+  directGain.gain.value = 1.0;
+  source.connect(directGain);
+  directGain.connect(offlineCtx.destination);
+
+  // Echo Reflection Path (Delayed & Filtered)
+  const delayNode = offlineCtx.createDelay(10.0);
+  delayNode.delayTime.value = delayTime;
+
+  const filterNode = offlineCtx.createBiquadFilter();
+  filterNode.type = 'lowpass';
+  filterNode.frequency.value = material.highFreqCutoff;
+
+  const echoGain = offlineCtx.createGain();
+  // Inverse-Square Law distance attenuation + material absorption factor
+  const distanceAttenuation = 1 / Math.max(1, Math.pow(distance, 1.5) * 0.1);
+  const reflectivity = 1 - material.absorption;
+  const totalReflectionGain = distanceAttenuation * reflectivity;
+  echoGain.gain.value = totalReflectionGain;
+
+  // Connect Echo Graph
+  source.connect(delayNode);
+  delayNode.connect(filterNode);
+  filterNode.connect(echoGain);
+  echoGain.connect(offlineCtx.destination);
+
+  // Render processed buffer
+  source.start(0);
+  currentRenderedBuffer = await offlineCtx.startRendering();
+
+  // 4. Update Visualizer, Stats, and Audio Controls
+  drawWaveform(canvas, currentRenderedBuffer, delayTime);
+
+  delayStat.textContent = `${(delayTime * 1000).toFixed(2)} ms`;
+  const dbLoss = 20 * Math.log10(Math.max(0.00001, totalReflectionGain));
+  ampStat.textContent = `${dbLoss.toFixed(1)} dB`;
+
+  // Attach audio to HTML audio element
+  const wavBlob = audioBufferToWavBlob(currentRenderedBuffer);
+  const audioUrl = URL.createObjectURL(wavBlob);
+  audioPlayer.src = audioUrl;
+  downloadBtn.disabled = false;
+}
+
+/**
+ * Generate Audio Pulse Base Signals
+ */
+function createPulseBuffer(ctx, type, duration, sampleRate) {
+  const numSamples = Math.floor(duration * sampleRate);
+  const buffer = ctx.createBuffer(1, numSamples, sampleRate);
+  const data = buffer.getChannelData(0);
+
+  for (let i = 0; i < numSamples; i++) {
+    const t = i / sampleRate;
+    // Envelope (fade in/out to prevent click artifacts)
+    const env = Math.sin(Math.PI * (i / numSamples));
+
+    if (type === 'ping') {
+      // 1 kHz Sine Ping
+      data[i] = Math.sin(2 * Math.PI * 1000 * t) * env;
+    } else if (type === 'chirp') {
+      // Linear frequency sweep from 1 kHz to 8 kHz
+      const fStart = 1000;
+      const fEnd = 8000;
+      const freq = fStart + (fEnd - fStart) * (t / (2 * duration));
+      data[i] = Math.sin(2 * Math.PI * freq * t) * env;
+    }
+  }
+  return buffer;
+}
+
+/**
+ * Render Audio Waveform on 2D Canvas
+ */
+function drawWaveform(canvasEl, audioBuffer, delayTime) {
+  const ctx = canvasEl.getContext('2d');
+  const width = canvasEl.width = canvasEl.clientWidth * window.devicePixelRatio;
+  const height = canvasEl.height = canvasEl.clientHeight * window.devicePixelRatio;
+
+  const channelData = audioBuffer.getChannelData(0);
+  const step = Math.ceil(channelData.length / width);
+  const midY = height / 2;
+
+  ctx.fillStyle = "#020617";
+  ctx.fillRect(0, 0, width, height);
+
+  // Draw timeline grid
+  ctx.strokeStyle = "#1e293b";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(0, midY);
+  ctx.lineTo(width, midY);
+  ctx.stroke();
+
+  // Draw Delay Marker Line
+  const delaySampleIndex = Math.floor(delayTime * audioBuffer.sampleRate);
+  const delayX = (delaySampleIndex / channelData.length) * width;
+
+  ctx.strokeStyle = "#f59e0b"; // Orange marker for echo arrival
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath();
+  ctx.moveTo(delayX, 0);
+  ctx.lineTo(delayX, height);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Label Echo Arrival Point
+  ctx.fillStyle = "#f59e0b";
+  ctx.font = `${10 * window.devicePixelRatio}px sans-serif`;
+  ctx.fillText("Echo Arrival", delayX + 5, 15 * window.devicePixelRatio);
+
+  // Draw Audio Waveform
+  ctx.strokeStyle = "#10b981"; // Emerald green signal
+  ctx.lineWidth = 1.5 * window.devicePixelRatio;
+  ctx.beginPath();
+
+  for (let i = 0; i < width; i++) {
+    let min = 1.0;
+    let max = -1.0;
+
+    for (let j = 0; j < step; j++) {
+      const idx = i * step + j;
+      if (idx < channelData.length) {
+        const val = channelData[idx];
+        if (val < min) min = val;
+        if (val > max) max = val;
+      }
+    }
+
+    ctx.moveTo(i, midY + min * midY);
+    ctx.lineTo(i, midY + max * midY);
+  }
+  ctx.stroke();
+}
+
+/**
+ * Convert AudioBuffer to WAV File Blob
+ */
+function audioBufferToWavBlob(buffer) {
+  const numChannels = 1;
+  const sampleRate = buffer.sampleRate;
+  const bitDepth = 16;
+  const samples = buffer.getChannelData(0);
+
+  const bytesPerSample = bitDepth / 8;
+  const blockAlign = numChannels * bytesPerSample;
+  const wavBuffer = new ArrayBuffer(44 + samples.length * bytesPerSample);
+  const view = new DataView(wavBuffer);
+
+  /* RIFF header */
+  writeString(view, 0, 'RIFF');
+  view.setUint32(4, 36 + samples.length * bytesPerSample, true);
+  writeString(view, 8, 'WAVE');
+  /* FMT chunk */
+  writeString(view, 12, 'fmt ');
+  view.setUint32(16, 16, true); // Subchunk1Size
+  view.setUint16(20, 1, true);  // PCM format
+  view.setUint16(22, numChannels, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * blockAlign, true);
+  view.setUint16(32, blockAlign, true);
+  view.setUint16(34, bitDepth, true);
+  /* DATA chunk */
+  writeString(view, 36, 'data');
+  view.setUint32(40, samples.length * bytesPerSample, true);
+
+  // Write PCM audio data
+  let offset = 44;
+  for (let i = 0; i < samples.length; i++, offset += 2) {
+    const s = Math.max(-1, Math.min(1, samples[i]));
+    view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+  }
+
+  return new Blob([wavBuffer], { type: 'audio/wav' });
+}
+
+function writeString(view, offset, string) {
+  for (let i = 0; i < string.length; i++) {
+    view.setUint8(offset + i, string.charCodeAt(i));
+  }
+}
+
+// Event Listeners
+simulateBtn.addEventListener('click', runSimulation);
+downloadBtn.addEventListener('click', () => {
+  if (!currentRenderedBuffer) return;
+  const blob = audioBufferToWavBlob(currentRenderedBuffer);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `echo_${materialSelect.value}_${distanceInput.value}m.wav`;
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+// Run initial simulation on load
+runSimulation();
+</script>
+</body>
+</html>
